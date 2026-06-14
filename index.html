@@ -869,12 +869,17 @@ let zenNodes = [], engineNodes = [];
 let bellTimer = null, revTimer = null;
 
 // ── 禅音 ──────────────────────────────────────────────────────
+function stopAll() {
+  if (zenOn)    { stopZen();    zenOn    = false; setBtn('zen-btn',    false, '♪ 禅音',   '#80d0c0'); }
+  if (engineOn) { stopEngine(); engineOn = false; setBtn('engine-btn', false, '🔥 引擎',  '#f08040'); }
+  if (sunsetOn) { stopSunset(); sunsetOn = false; setBtn('sunset-btn', false, '🌅 日落大道','#e0a040'); }
+}
+
 function toggleZen() {
   if (_ac.state === 'suspended') _ac.resume();
-  if (engineOn) stopEngine();
-  zenOn ? stopZen() : startZen();
-  zenOn = !zenOn;
-  setBtn('zen-btn', zenOn, '♪ 禅音', '#80d0c0');
+  const wasOn = zenOn;
+  stopAll();
+  if (!wasOn) { zenOn = true; setBtn('zen-btn', true, '♪ 禅音', '#80d0c0'); startZen(); }
 }
 
 let _zenBuf = null, _zenSource = null, _zenGain = null;
@@ -906,15 +911,9 @@ function stopZen() {
 // ── 引擎音 ────────────────────────────────────────────────────
 async function toggleEngine() {
   if (_ac.state === 'suspended') _ac.resume();
-  if (zenOn) { stopZen(); zenOn = false; setBtn('zen-btn', false, '♪ 禅音', '#80d0c0'); }
-  if (engineOn) {
-    stopEngine(); engineOn = false;
-    setBtn('engine-btn', false, '🔥 引擎', '#f08040');
-  } else {
-    engineOn = true;
-    setBtn('engine-btn', true, '🔥 引擎', '#f08040');
-    await startEngine();
-  }
+  const wasOn = engineOn;
+  stopAll();
+  if (!wasOn) { engineOn = true; setBtn('engine-btn', true, '🔥 引擎', '#f08040'); await startEngine(); }
 }
 
 const ENG_FILES = [
@@ -980,16 +979,9 @@ let _sunBuf = null, _sunSource = null, _sunGain = null;
 
 async function toggleSunset() {
   if (_ac.state === 'suspended') _ac.resume();
-  if (zenOn) { stopZen(); zenOn = false; setBtn('zen-btn', false, '♪ 禅音', '#80d0c0'); }
-  if (engineOn) { stopEngine(); engineOn = false; setBtn('engine-btn', false, '🔥 引擎', '#f08040'); }
-  if (sunsetOn) {
-    stopSunset(); sunsetOn = false;
-    setBtn('sunset-btn', false, '🌅 日落大道', '#e0a040');
-  } else {
-    sunsetOn = true;
-    setBtn('sunset-btn', true, '🌅 日落大道', '#e0a040');
-    await startSunset();
-  }
+  const wasOn = sunsetOn;
+  stopAll();
+  if (!wasOn) { sunsetOn = true; setBtn('sunset-btn', true, '🌅 日落大道', '#e0a040'); await startSunset(); }
 }
 
 async function startSunset() {
