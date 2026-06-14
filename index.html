@@ -331,6 +331,10 @@
       background:none;border:1px solid rgba(255,255,255,0.15);border-radius:20px;
       color:#888;font-size:13px;padding:4px 12px;cursor:pointer;transition:all 0.2s;
     ">🔥 引擎</button>
+    <button id="sunset-btn" onclick="toggleSunset()" style="
+      background:none;border:1px solid rgba(255,255,255,0.15);border-radius:20px;
+      color:#888;font-size:13px;padding:4px 12px;cursor:pointer;transition:all 0.2s;
+    ">🌅 日落大道</button>
     <div class="timer" id="timer">00:00</div>
   </div>
 </header>
@@ -728,7 +732,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Audio Ambient ─────────────────────────────────────────────
-let zenOn = false, engineOn = false;
+let zenOn = false, engineOn = false, sunsetOn = false;
 let zenNodes = [], engineNodes = [];
 let bellTimer = null, revTimer = null;
 
@@ -837,6 +841,46 @@ function stopEngine() {
     setTimeout(() => { try { _engGainNode.disconnect(); } catch(e){} _engGainNode = null; }, 1100);
   }
   engineNodes = [];
+}
+
+// ── 日落大道 ──────────────────────────────────────────────────
+let _sunBuf = null, _sunSource = null, _sunGain = null;
+
+async function toggleSunset() {
+  if (_ac.state === 'suspended') _ac.resume();
+  if (zenOn) { stopZen(); zenOn = false; setBtn('zen-btn', false, '♪ 禅音', '#80d0c0'); }
+  if (engineOn) { stopEngine(); engineOn = false; setBtn('engine-btn', false, '🔥 引擎', '#f08040'); }
+  if (sunsetOn) {
+    stopSunset(); sunsetOn = false;
+    setBtn('sunset-btn', false, '🌅 日落大道', '#e0a040');
+  } else {
+    sunsetOn = true;
+    setBtn('sunset-btn', true, '🌅 日落大道', '#e0a040');
+    await startSunset();
+  }
+}
+
+async function startSunset() {
+  if (!_sunBuf) {
+    const resp = await fetch('assets/sunset_blvd.m4a');
+    const arr = await resp.arrayBuffer();
+    _sunBuf = await _ac.decodeAudioData(arr);
+  }
+  const src = _ac.createBufferSource();
+  src.buffer = _sunBuf;
+  src.loop = true;
+  const gain = _ac.createGain();
+  gain.gain.setValueAtTime(0, _ac.currentTime);
+  gain.gain.linearRampToValueAtTime(0.85, _ac.currentTime + 2);
+  src.connect(gain); gain.connect(_ac.destination);
+  src.start();
+  _sunSource = src; _sunGain = gain;
+}
+
+function stopSunset() {
+  if (_sunGain) _sunGain.gain.linearRampToValueAtTime(0, _ac.currentTime + 1.5);
+  if (_sunSource) { try { _sunSource.stop(_ac.currentTime + 1.6); } catch(e){} }
+  _sunSource = null; _sunGain = null;
 }
 
 // ── 按钮样式辅助 ──────────────────────────────────────────────
