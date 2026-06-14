@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>数独</title>
+  <meta name="description" content="经典数独游戏 — 四档难度，笔记模式，计时挑战">
+  <meta property="og:title" content="数独">
+  <meta property="og:description" content="经典数独游戏 — 四档难度，笔记模式，计时挑战">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="数独">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background: #0d0d14;
+      color: #e8e8f0;
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 12px 32px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    * { position: relative; z-index: 1; }
+
+    /* Header */
+    header {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .title { font-size: 24px; font-weight: 800; letter-spacing: 1px; color: #fff; }
+
+    .timer {
+      font-size: 20px;
+      font-weight: 700;
+      color: #60c0f0;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 1px;
+    }
+
+    /* Difficulty */
+    .difficulty-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .diff-btn {
+      flex: 1;
+      padding: 7px 4px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.05);
+      color: #aaa;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .diff-btn:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
+    .diff-btn.active { background: rgba(100,180,255,0.2); border-color: #60c0f0; color: #60c0f0; }
+
+    /* Stats row */
+    .stats-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .stat-pill {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 6px 10px;
+      text-align: center;
+      font-size: 11px;
+      color: #888;
+    }
+
+    .stat-pill b { display: block; font-size: 16px; font-weight: 700; color: #fff; margin-top: 2px; }
+    .stat-pill b.red { color: #e05050; }
+
+    /* Board */
+    #board-wrap {
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .board-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      aspect-ratio: 1;
+      background: url('assets/logo_transparent.png') center/contain no-repeat;
+      opacity: 0.1;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 0;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0d0d14;
+      width: 100%;
+      aspect-ratio: 1;
+    }
+
+    .cell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      aspect-ratio: 1;
+      border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.1s;
+      font-size: clamp(14px, 4vw, 22px);
+      font-weight: 700;
+    }
+
+    /* Thick box borders */
+    .cell:nth-child(3n) { border-right: 2px solid rgba(255,255,255,0.3); }
+    .cell:nth-child(9n) { border-right: 1px solid rgba(255,255,255,0.1); }
+    .cell[data-row="2"], .cell[data-row="5"] { border-bottom: 2px solid rgba(255,255,255,0.3); }
+
+    /* Cell states */
+    .cell.given    { color: #ffffff; background: rgba(255,255,255,0.04); }
+    .cell.user     { color: #60c0f0; }
+    .cell.selected { background: rgba(100,160,255,0.25) !important; }
+    .cell.highlight { background: rgba(100,160,255,0.1); }
+    .cell.same-num  { background: rgba(100,160,255,0.18); }
+    .cell.error     { color: #e05050 !important; background: rgba(200,50,50,0.15) !important; }
+    .cell.given.error { color: #ff8080 !important; }
+
+    /* Notes grid inside cell */
+    .notes {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      width: 100%;
+      height: 100%;
+      padding: 1px;
+    }
+
+    .note-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(6px, 1.5vw, 9px);
+      font-weight: 500;
+      color: #80a0d0;
+      line-height: 1;
+    }
+
+    .note-num.empty { color: transparent; }
+
+    /* Controls */
+    .controls {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    .mode-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      color: #aaa;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .mode-btn.active { background: rgba(100,200,100,0.15); border-color: #60e080; color: #60e080; }
+
+    .mode-btn svg { width: 16px; height: 16px; }
+
+    .erase-btn {
+      padding: 10px 16px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      color: #aaa;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .erase-btn:hover { border-color: rgba(255,80,80,0.5); color: #e07070; }
+
+    .new-btn {
+      margin-left: auto;
+      padding: 10px 16px;
+      border: 1px solid rgba(200,50,50,0.4);
+      border-radius: 10px;
+      background: rgba(200,50,50,0.1);
+      color: #e07070;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .new-btn:hover { background: rgba(200,50,50,0.2); }
+
+    /* Numpad */
+    #numpad {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 6px;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .num-btn {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.06);
+      color: #e8e8f0;
+      font-size: clamp(14px, 4vw, 20px);
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.1s;
+      user-select: none;
+    }
+
+    .num-btn:hover   { background: rgba(100,160,255,0.2); border-color: #60c0f0; color: #60c0f0; }
+    .num-btn:active  { transform: scale(0.92); }
+    .num-btn.dim     { opacity: 0.3; }
+
+    /* Win overlay */
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #overlay.active { display: flex; }
+
+    .modal {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 1px solid rgba(100,160,255,0.3);
+      border-radius: 20px;
+      padding: 36px 40px;
+      text-align: center;
+      max-width: 300px;
+      width: 90%;
+    }
+
+    .modal h2 {
+      font-size: 28px;
+      background: linear-gradient(135deg, #f0d060, #60e080);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+
+    .modal p { color: #aaa; font-size: 14px; margin-bottom: 6px; }
+    .modal .big { font-size: 36px; font-weight: 800; color: #60c0f0; margin: 12px 0; }
+
+    .btn {
+      display: inline-block;
+      margin-top: 18px;
+      padding: 12px 32px;
+      background: linear-gradient(135deg, #3060c0, #1040a0);
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .btn:hover { transform: scale(1.04); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="title">数独</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button id="zen-btn" onclick="toggleZen()" style="
+      background:none;border:1px solid rgba(255,255,255,0.15);border-radius:20px;
+      color:#888;font-size:13px;padding:4px 12px;cursor:pointer;transition:all 0.2s;
+    ">♪ 禅音</button>
+    <button id="engine-btn" onclick="toggleEngine()" style="
+      background:none;border:1px solid rgba(255,255,255,0.15);border-radius:20px;
+      color:#888;font-size:13px;padding:4px 12px;cursor:pointer;transition:all 0.2s;
+    ">🔥 引擎</button>
+    <div class="timer" id="timer">00:00</div>
+  </div>
+</header>
+
+<div class="difficulty-row">
+  <div class="diff-btn active" onclick="setDiff('easy')">简单</div>
+  <div class="diff-btn" onclick="setDiff('medium')">中等</div>
+  <div class="diff-btn" onclick="setDiff('hard')">困难</div>
+  <div class="diff-btn" onclick="setDiff('expert')">专家</div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-pill">难度<b id="diff-label">简单</b></div>
+  <div class="stat-pill">错误<b class="red" id="error-count">0</b></div>
+  <div class="stat-pill">剩余<b id="remain-count">81</b></div>
+</div>
+
+<div id="board-wrap">
+  <div class="board-watermark"></div>
+  <div id="board"></div>
+</div>
+
+<div class="controls">
+  <button class="mode-btn" id="note-btn" onclick="toggleNote()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+    笔记
+  </button>
+  <button class="erase-btn" onclick="eraseCell()">清除</button>
+  <button class="new-btn" onclick="newGame()">新游戏</button>
+</div>
+
+<div id="numpad"></div>
+
+<div id="overlay">
+  <div class="modal">
+    <h2>🎉 完成！</h2>
+    <p>恭喜你完成数独！</p>
+    <div class="big" id="win-time">00:00</div>
+    <p id="win-errors"></p>
+    <button class="btn" onclick="newGame()">再来一局</button>
+  </div>
+</div>
+
+<script>
+// ── Sudoku generator ─────────────────────────────────────────
+function generateSolution() {
+  const grid = Array.from({length: 9}, () => Array(9).fill(0));
+  fillGrid(grid);
+  return grid;
+}
+
+function fillGrid(grid) {
+  const pos = findEmpty(grid);
+  if (!pos) return true;
+  const [r, c] = pos;
+  const nums = shuffle([1,2,3,4,5,6,7,8,9]);
+  for (const n of nums) {
+    if (isValid(grid, r, c, n)) {
+      grid[r][c] = n;
+      if (fillGrid(grid)) return true;
+      grid[r][c] = 0;
+    }
+  }
+  return false;
+}
+
+function findEmpty(grid) {
+  for (let r = 0; r < 9; r++)
+    for (let c = 0; c < 9; c++)
+      if (grid[r][c] === 0) return [r, c];
+  return null;
+}
+
+function isValid(grid, r, c, n) {
+  if (grid[r].includes(n)) return false;
+  if (grid.some(row => row[c] === n)) return false;
+  const br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+  for (let i = 0; i < 3; i++)
+    for (let j = 0; j < 3; j++)
+      if (grid[br+i][bc+j] === n) return false;
+  return true;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr;
+}
+
+const REMOVE_COUNT = { easy: 35, medium: 45, hard: 52, expert: 58 };
+const DIFF_LABEL   = { easy: '简单', medium: '中等', hard: '困难', expert: '专家' };
+
+function makePuzzle(solution, diff) {
+  const puzzle = solution.map(r => [...r]);
+  const cells = shuffle([...Array(81).keys()]);
+  let removed = 0;
+  for (const idx of cells) {
+    if (removed >= REMOVE_COUNT[diff]) break;
+    const r = Math.floor(idx/9), c = idx%9;
+    puzzle[r][c] = 0;
+    removed++;
+  }
+  return puzzle;
+}
+
+// ── Game state ───────────────────────────────────────────────
+let solution = [], puzzle = [], userGrid = [], notes = [];
+let selected = null;
+let noteMode = false;
+let errorCount = 0;
+let diff = 'easy';
+let timerSec = 0, timerHandle = null;
+let finished = false;
+
+// ── Init ─────────────────────────────────────────────────────
+function newGame() {
+  document.getElementById('overlay').classList.remove('active');
+  solution = generateSolution();
+  puzzle   = makePuzzle(solution, diff);
+  userGrid = puzzle.map(r => [...r]);
+  notes    = Array.from({length:9}, () => Array.from({length:9}, () => new Set()));
+  selected = null;
+  noteMode = false;
+  errorCount = 0;
+  finished = false;
+  document.getElementById('note-btn').classList.remove('active');
+  resetTimer();
+  startTimer();
+  renderBoard();
+  renderNumpad();
+  updateStats();
+}
+
+function setDiff(d) {
+  diff = d;
+  document.querySelectorAll('.diff-btn').forEach((el,i) => {
+    el.classList.toggle('active', ['easy','medium','hard','expert'][i] === d);
+  });
+  document.getElementById('diff-label').textContent = DIFF_LABEL[d];
+  newGame();
+}
+
+// ── Timer ────────────────────────────────────────────────────
+function startTimer() {
+  clearInterval(timerHandle);
+  timerHandle = setInterval(() => {
+    if (!finished) { timerSec++; updateTimerDisplay(); }
+  }, 1000);
+}
+
+function resetTimer() {
+  clearInterval(timerHandle);
+  timerSec = 0;
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const m = String(Math.floor(timerSec/60)).padStart(2,'0');
+  const s = String(timerSec%60).padStart(2,'0');
+  document.getElementById('timer').textContent = `${m}:${s}`;
+}
+
+// ── Board render ─────────────────────────────────────────────
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+      cell.dataset.row = r;
+      updateCellDisplay(cell, r, c);
+      cell.addEventListener('click', () => selectCell(r, c));
+      board.appendChild(cell);
+    }
+  }
+}
+
+function getCellEl(r, c) {
+  return document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+}
+
+function updateCellDisplay(cell, r, c) {
+  const val = userGrid[r][c];
+  const isGiven = puzzle[r][c] !== 0;
+
+  cell.innerHTML = '';
+
+  if (val !== 0) {
+    cell.textContent = val;
+    cell.classList.toggle('given', isGiven);
+    cell.classList.toggle('user', !isGiven);
+    const wrong = !isGiven && val !== solution[r][c];
+    cell.classList.toggle('error', wrong);
+  } else {
+    // Show notes
+    const cellNotes = notes[r][c];
+    if (cellNotes.size > 0) {
+      const noteGrid = document.createElement('div');
+      noteGrid.className = 'notes';
+      for (let n = 1; n <= 9; n++) {
+        const span = document.createElement('div');
+        span.className = 'note-num' + (cellNotes.has(n) ? '' : ' empty');
+        span.textContent = cellNotes.has(n) ? n : '';
+        noteGrid.appendChild(span);
+      }
+      cell.appendChild(noteGrid);
+      cell.classList.remove('given','user','error');
+    } else {
+      cell.classList.remove('given','user','error');
+    }
+  }
+}
+
+function refreshHighlights() {
+  document.querySelectorAll('.cell').forEach(cell => {
+    const r = +cell.dataset.r, c = +cell.dataset.c;
+    cell.classList.remove('selected','highlight','same-num');
+
+    if (!selected) return;
+    const [sr, sc] = selected;
+
+    if (r === sr && c === sc) {
+      cell.classList.add('selected');
+    } else {
+      const sVal = userGrid[sr][sc];
+      const cVal = userGrid[r][c];
+      const sameBox = Math.floor(r/3)===Math.floor(sr/3) && Math.floor(c/3)===Math.floor(sc/3);
+      if (r === sr || c === sc || sameBox) {
+        cell.classList.add('highlight');
+      }
+      if (sVal !== 0 && sVal === cVal) {
+        cell.classList.add('same-num');
+      }
+    }
+  });
+}
+
+// ── Input ────────────────────────────────────────────────────
+function selectCell(r, c) {
+  selected = [r, c];
+  refreshHighlights();
+}
+
+function inputNumber(n) {
+  if (!selected || finished) return;
+  const [r, c] = selected;
+  if (puzzle[r][c] !== 0) return; // given cell
+
+  if (noteMode) {
+    if (userGrid[r][c] !== 0) return;
+    const cellNotes = notes[r][c];
+    cellNotes.has(n) ? cellNotes.delete(n) : cellNotes.add(n);
+  } else {
+    userGrid[r][c] = n;
+    // clear notes in same row/col/box for this number
+    for (let i = 0; i < 9; i++) {
+      notes[r][i].delete(n);
+      notes[i][c].delete(n);
+    }
+    const br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+    for (let i = 0; i < 3; i++)
+      for (let j = 0; j < 3; j++)
+        notes[br+i][bc+j].delete(n);
+
+    if (n !== solution[r][c]) {
+      errorCount++;
+      playErrorSound();
+    } else {
+      playInputSound();
+    }
+    updateStats();
+    checkWin();
+  }
+
+  const cell = getCellEl(r, c);
+  updateCellDisplay(cell, r, c);
+  refreshHighlights();
+  renderNumpad();
+}
+
+function eraseCell() {
+  if (!selected || finished) return;
+  const [r, c] = selected;
+  if (puzzle[r][c] !== 0) return;
+  userGrid[r][c] = 0;
+  notes[r][c].clear();
+  const cell = getCellEl(r, c);
+  updateCellDisplay(cell, r, c);
+  refreshHighlights();
+  updateStats();
+  renderNumpad();
+}
+
+function toggleNote() {
+  noteMode = !noteMode;
+  document.getElementById('note-btn').classList.toggle('active', noteMode);
+}
+
+// ── Numpad ───────────────────────────────────────────────────
+function renderNumpad() {
+  const pad = document.getElementById('numpad');
+  pad.innerHTML = '';
+  // Count how many of each number are placed correctly
+  const placed = Array(10).fill(0);
+  for (let r = 0; r < 9; r++)
+    for (let c = 0; c < 9; c++)
+      if (userGrid[r][c] !== 0 && userGrid[r][c] === solution[r][c])
+        placed[userGrid[r][c]]++;
+
+  for (let n = 1; n <= 9; n++) {
+    const btn = document.createElement('div');
+    btn.className = 'num-btn' + (placed[n] >= 9 ? ' dim' : '');
+    btn.textContent = n;
+    btn.addEventListener('click', () => inputNumber(n));
+    pad.appendChild(btn);
+  }
+}
+
+// ── Stats ────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('error-count').textContent = errorCount;
+  let empty = 0;
+  for (let r = 0; r < 9; r++)
+    for (let c = 0; c < 9; c++)
+      if (userGrid[r][c] === 0) empty++;
+  document.getElementById('remain-count').textContent = empty;
+}
+
+// ── Win check ────────────────────────────────────────────────
+function checkWin() {
+  for (let r = 0; r < 9; r++)
+    for (let c = 0; c < 9; c++)
+      if (userGrid[r][c] !== solution[r][c]) return;
+  finished = true;
+  clearInterval(timerHandle);
+  playWinSound();
+  setTimeout(() => {
+    document.getElementById('win-time').textContent = document.getElementById('timer').textContent;
+    document.getElementById('win-errors').textContent = errorCount === 0 ? '零错误完美通关！' : `错误 ${errorCount} 次`;
+    document.getElementById('overlay').classList.add('active');
+  }, 400);
+}
+
+// ── Audio ────────────────────────────────────────────────────
+const _ac = new (window.AudioContext || window.webkitAudioContext)();
+
+function beep(freq, type, vol, dur, t0) {
+  const osc = _ac.createOscillator();
+  const gain = _ac.createGain();
+  osc.connect(gain); gain.connect(_ac.destination);
+  osc.type = type; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol, t0 + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  osc.start(t0); osc.stop(t0 + dur);
+}
+
+function playInputSound() {
+  beep(880, 'sine', 0.18, 0.12, _ac.currentTime);
+}
+
+function playErrorSound() {
+  beep(200, 'sawtooth', 0.2, 0.18, _ac.currentTime);
+  beep(150, 'sawtooth', 0.15, 0.18, _ac.currentTime + 0.1);
+}
+
+function playWinSound() {
+  [523,659,784,1047].forEach((f,i) => beep(f,'sine',0.25,0.3,_ac.currentTime+i*0.12));
+}
+
+document.addEventListener('click', () => { if (_ac.state==='suspended') _ac.resume(); }, {once:true});
+
+// Keyboard support
+document.addEventListener('keydown', e => {
+  if (e.key >= '1' && e.key <= '9') inputNumber(+e.key);
+  if (e.key === '0' || e.key === 'Backspace' || e.key === 'Delete') eraseCell();
+  if (e.key === 'n' || e.key === 'N') toggleNote();
+  if (!selected) return;
+  const [r,c] = selected;
+  const dirs = { ArrowUp:[-1,0], ArrowDown:[1,0], ArrowLeft:[0,-1], ArrowRight:[0,1] };
+  if (dirs[e.key]) {
+    const [dr,dc] = dirs[e.key];
+    const nr = Math.max(0,Math.min(8,r+dr)), nc = Math.max(0,Math.min(8,c+dc));
+    selectCell(nr,nc);
+    e.preventDefault();
+  }
+});
+
+// ── Audio Ambient ─────────────────────────────────────────────
+let zenOn = false, engineOn = false;
+let zenNodes = [], engineNodes = [];
+let bellTimer = null, revTimer = null;
+
+// ── 禅音 ──────────────────────────────────────────────────────
+function toggleZen() {
+  if (_ac.state === 'suspended') _ac.resume();
+  if (engineOn) stopEngine();
+  zenOn ? stopZen() : startZen();
+  zenOn = !zenOn;
+  setBtn('zen-btn', zenOn, '♪ 禅音', '#80d0c0');
+}
+
+function startZen() {
+  // 轻微失谐的纯正弦波，营造温暖感
+  [55, 55.15, 110, 165].forEach((freq, i) => {
+    const osc = _ac.createOscillator(), gain = _ac.createGain();
+    osc.connect(gain); gain.connect(_ac.destination);
+    osc.type = 'sine'; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, _ac.currentTime);
+    gain.gain.linearRampToValueAtTime([0.06, 0.05, 0.03, 0.02][i], _ac.currentTime + 4);
+    osc.start(); zenNodes.push({ osc, gain });
+  });
+  scheduleBell();
+}
+
+function scheduleBell() {
+  bellTimer = setTimeout(() => {
+    if (!zenOn) return;
+    const scale = [293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99];
+    const freq = scale[Math.floor(Math.random() * scale.length)];
+    const osc = _ac.createOscillator(), gain = _ac.createGain();
+    osc.connect(gain); gain.connect(_ac.destination);
+    osc.type = 'sine'; osc.frequency.value = freq;
+    const osc2 = _ac.createOscillator(), gain2 = _ac.createGain();
+    osc2.connect(gain2); gain2.connect(_ac.destination);
+    osc2.type = 'sine'; osc2.frequency.value = freq * 2.756;
+    gain2.gain.setValueAtTime(0.03, _ac.currentTime);
+    gain2.gain.exponentialRampToValueAtTime(0.001, _ac.currentTime + 3);
+    osc2.start(); osc2.stop(_ac.currentTime + 3);
+    const t = _ac.currentTime;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.09, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 4);
+    osc.start(t); osc.stop(t + 4);
+    scheduleBell();
+  }, 4000 + Math.random() * 8000);
+}
+
+function stopZen() {
+  clearTimeout(bellTimer);
+  zenNodes.forEach(({ osc, gain }) => {
+    gain.gain.linearRampToValueAtTime(0, _ac.currentTime + 2);
+    osc.stop(_ac.currentTime + 2.1);
+  });
+  zenNodes = [];
+}
+
+// ── 引擎音 ────────────────────────────────────────────────────
+async function toggleEngine() {
+  if (_ac.state === 'suspended') _ac.resume();
+  if (zenOn) { stopZen(); zenOn = false; setBtn('zen-btn', false, '♪ 禅音', '#80d0c0'); }
+  if (engineOn) {
+    stopEngine(); engineOn = false;
+    setBtn('engine-btn', false, '🔥 引擎', '#f08040');
+  } else {
+    engineOn = true;
+    setBtn('engine-btn', true, '🔥 引擎', '#f08040');
+    await startEngine();
+  }
+}
+
+let _engBufs = [], _engSource = null, _engGainNode = null, _engIdx = 0;
+
+async function loadEngineBufs() {
+  if (_engBufs.length === 6) return;
+  _engBufs = await Promise.all(
+    Array.from({length: 6}, (_, i) =>
+      fetch(`assets/engine_loop${i}.wav`)
+        .then(r => r.arrayBuffer())
+        .then(a => _ac.decodeAudioData(a))
+    )
+  );
+}
+
+function playEngineSegment(idx) {
+  if (!engineOn || !_engGainNode) return;
+  const src = _ac.createBufferSource();
+  src.buffer = _engBufs[idx];
+  src.loop = false;
+  src.connect(_engGainNode);
+  _engSource = src;
+  src.onended = () => {
+    if (!engineOn || !_engGainNode || _engSource !== src) return;
+    _engIdx = (_engIdx + 1) % 6;
+    playEngineSegment(_engIdx);
+  };
+  src.start();
+}
+
+async function startEngine() {
+  await loadEngineBufs();
+
+  const gain = _ac.createGain();
+  gain.gain.setValueAtTime(0, _ac.currentTime);
+  gain.gain.linearRampToValueAtTime(0.8, _ac.currentTime + 1.5);
+  gain.connect(_ac.destination);
+  _engGainNode = gain;
+
+  _engIdx = 0;
+  playEngineSegment(0);
+}
+
+function stopEngine() {
+  if (_engGainNode) {
+    _engGainNode.gain.linearRampToValueAtTime(0, _ac.currentTime + 1.0);
+  }
+  if (_engSource) {
+    _engSource.onended = null;
+    try { _engSource.stop(_ac.currentTime + 1.1); } catch(e) {}
+  }
+  _engSource = null; _engGainNode = null;
+  engineNodes = [];
+}
+
+// ── 按钮样式辅助 ──────────────────────────────────────────────
+// color: hex like '#80d0c0'
+function setBtn(id, on, label, color) {
+  const btn = document.getElementById(id);
+  btn.textContent = on ? label + ' ON' : label;
+  const r = parseInt(color.slice(1,3),16), g = parseInt(color.slice(3,5),16), b = parseInt(color.slice(5,7),16);
+  btn.style.color = on ? color : '#888';
+  btn.style.borderColor = on ? `rgba(${r},${g},${b},0.5)` : 'rgba(255,255,255,0.15)';
+  btn.style.background = on ? `rgba(${r},${g},${b},0.15)` : 'none';
+}
+
+// ── Start ────────────────────────────────────────────────────
+newGame();
+</script>
+</body>
+</html>
