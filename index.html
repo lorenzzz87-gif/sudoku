@@ -800,15 +800,15 @@ async function toggleEngine() {
   }
 }
 
-// 7种不同引擎：赛车×5 + 普通车×2 + V8 + 重型车
 const ENG_FILES = [
-  'assets/engine_loop0.wav',   // 赛车怠速
-  'assets/eng2_sedan.ogg',     // 普通轿车
-  'assets/engine_loop2.wav',   // 赛车中转
-  'assets/eng6_v8.wav',        // V8 肌肉车
-  'assets/engine_loop4.wav',   // 赛车高转
-  'assets/eng3_sedan2.ogg',    // 轿车2
-  'assets/eng7_heavy.wav',     // 重型引擎
+  'assets/engine_custom.m4a',  // 自定义引擎音
+  'assets/engine_loop0.wav',
+  'assets/eng2_sedan.ogg',
+  'assets/engine_loop2.wav',
+  'assets/eng6_v8.wav',
+  'assets/engine_loop4.wav',
+  'assets/eng3_sedan2.ogg',
+  'assets/eng7_heavy.wav',
 ];
 
 let _engBufs = [], _engGainNode = null;
