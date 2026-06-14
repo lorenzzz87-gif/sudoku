@@ -823,7 +823,7 @@ function playEngineSegment(idx) {
   src.onended = () => {
     if (!engineOn || !_engGainNode || _engSource !== src) return;
     _engIdx = (_engIdx + 1) % 6;
-    playEngineSegment(_engIdx);
+    setTimeout(() => playEngineSegment(_engIdx), 0);
   };
   src.start();
 }
