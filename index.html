@@ -800,7 +800,10 @@ async function toggleEngine() {
   }
 }
 
-let _engBufs = [], _engSource = null, _engGainNode = null, _engIdx = 0;
+let _engBufs = [], _engGainNode = null;
+let _engSchedTimer = null, _engSchedIdx = 0, _engNextAt = 0;
+const ENG_LOOKAHEAD = 0.5; // 提前 0.5 秒调度
+const ENG_INTERVAL = 200;  // 每 200ms 检查一次
 
 async function loadEngineBufs() {
   if (_engBufs.length === 6) return;
@@ -813,19 +816,19 @@ async function loadEngineBufs() {
   );
 }
 
-function playEngineSegment(idx) {
+function engScheduleTick() {
   if (!engineOn || !_engGainNode) return;
-  const src = _ac.createBufferSource();
-  src.buffer = _engBufs[idx];
-  src.loop = false;
-  src.connect(_engGainNode);
-  _engSource = src;
-  src.onended = () => {
-    if (!engineOn || !_engGainNode || _engSource !== src) return;
-    _engIdx = (_engIdx + 1) % 6;
-    setTimeout(() => playEngineSegment(_engIdx), 0);
-  };
-  src.start();
+  // 把未来 lookahead 窗口内的段全部排进去
+  while (_engNextAt < _ac.currentTime + ENG_LOOKAHEAD) {
+    const buf = _engBufs[_engSchedIdx % 6];
+    const src = _ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(_engGainNode);
+    src.start(_engNextAt);
+    _engNextAt += buf.duration;
+    _engSchedIdx++;
+  }
+  _engSchedTimer = setTimeout(engScheduleTick, ENG_INTERVAL);
 }
 
 async function startEngine() {
@@ -837,19 +840,18 @@ async function startEngine() {
   gain.connect(_ac.destination);
   _engGainNode = gain;
 
-  _engIdx = 0;
-  playEngineSegment(0);
+  _engSchedIdx = 0;
+  _engNextAt = _ac.currentTime;
+  engScheduleTick();
 }
 
 function stopEngine() {
+  clearTimeout(_engSchedTimer);
+  _engSchedTimer = null;
   if (_engGainNode) {
     _engGainNode.gain.linearRampToValueAtTime(0, _ac.currentTime + 1.0);
+    setTimeout(() => { try { _engGainNode.disconnect(); } catch(e){} _engGainNode = null; }, 1100);
   }
-  if (_engSource) {
-    _engSource.onended = null;
-    try { _engSource.stop(_ac.currentTime + 1.1); } catch(e) {}
-  }
-  _engSource = null; _engGainNode = null;
   engineNodes = [];
 }
 
